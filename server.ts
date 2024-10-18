@@ -1,12 +1,10 @@
 import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
-import { GET_USERS_IN_LOBBY } from "./constants/general";
-import jwt from "jsonwebtoken";
-import { activeUsers, activeUsersSocketToUser } from "./lib/store";
-import generateId from "./lib/generateId";
+import { usersWaiting } from "./lib/store";
 import { socketioMiddleware } from "./lib/socketio.middleware";
 import { serverEvents } from "./lib/serverEvents";
+import { UserMatcherService } from "./lib/findMatchService";
 
 // maybe the JWT should have a unique id that will be connected to
 // the specific socket
@@ -26,10 +24,15 @@ app.prepare().then(() => {
 
   io.use(socketioMiddleware);
 
+  const userMatcherService = new UserMatcherService(io);
+  userMatcherService.startService();
+
   io.on("connection", (socket) => {
     console.log("connected");
 
-    serverEvents(socket, io);
+    userMatcherService.addUser(socket.id, socket.userId);
+
+    serverEvents(socket, io, userMatcherService);
   });
 
   httpServer

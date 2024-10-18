@@ -1,12 +1,14 @@
 import { Server, Socket } from "socket.io";
 import { activeUsers, activeUsersSocketToUser } from "./store";
-import { GET_USERS_IN_LOBBY } from "../constants/general";
+import { UserMatcherService } from "./findMatchService";
 
-export function serverEvents(socket: Socket, io: Server) {
+export function serverEvents(
+  socket: Socket,
+  io: Server,
+  userMatcherService: typeof UserMatcherService.prototype
+) {
   const usersInLobby = getUsersList(io);
-
-  console.log("got usersInLobby", usersInLobby);
-
+  
   if (usersInLobby) {
     for (const user of usersInLobby) {
       if (user.id === socket.userId) {
@@ -19,28 +21,12 @@ export function serverEvents(socket: Socket, io: Server) {
   activeUsersSocketToUser[socket.id] = socket.userId;
 
   socket.join("lobby");
-
   console.log(`${socket.username} joined lobby room`);
-
-  io.to("lobby").emit("welcome", {
-    id: socket.userId,
-    name: socket.username,
-  });
-
-  socket.on("message", (value) => {
-    socket.emit("message", value);
-  });
-
-  const emitMessage = [
-    ...(usersInLobby || []),
-    { id: socket.userId, socket: socket.id, name: socket.username },
-  ];
-
-  console.log("msg to emit", emitMessage);
-  socket.emit(GET_USERS_IN_LOBBY, emitMessage);
 
   socket.on("disconnect", (reason) => {
     console.log(`User ${socket.userId} disconnected:`, reason);
+
+    userMatcherService.removeUser(socket.id);
 
     delete activeUsersSocketToUser[socket.id];
 
@@ -48,25 +34,6 @@ export function serverEvents(socket: Socket, io: Server) {
       id: socket.userId,
       name: activeUsers[socket.userId].name,
     });
-    /// delete activeUsers[socket.userId];
-  });
-
-  socket.on("play_request", (id: string) => {
-    const socketId = activeUsers[id].socketId;
-    io.to(socketId).emit("play_request", {
-      userId: socket.userId,
-      name: socket.username,
-    });
-  });
-
-  socket.on("accept_request", (id: string) => {
-    const socketId = activeUsers[id].socketId;
-    io.to(socketId).emit("accept_request", id);
-  });
-
-  socket.on("decline_request", (id: string) => {
-    const socketId = activeUsers[id].socketId;
-    io.to(socketId).emit("decline_request", id);
   });
 }
 

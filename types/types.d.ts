@@ -1,4 +1,3 @@
-
 type UserSocketToUserId = {
   id: string;
   socketId: string;
@@ -8,4 +7,9 @@ type UserSocketToUserId = {
 type Invitation = {
   id: string;
   name: string;
+};
+
+type WaitingUser = {
+  socketId: string;
+  userId: string;
 };
