@@ -1,11 +1,21 @@
 import { createServer } from "node:http";
 import next from "next";
 import { Server } from "socket.io";
+import { GET_USERS_IN_LOBBY } from "./constants/general";
+import jwt from "jsonwebtoken";
+import { activeUsers, activeUsersSocketToUser } from "./lib/store";
+import generateId from "./lib/generateId";
+import { socketioMiddleware } from "./lib/socketio.middleware";
+import { serverEvents } from "./lib/serverEvents";
+
+// maybe the JWT should have a unique id that will be connected to
+// the specific socket
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
 const port = 3000;
 // when using middleware `hostname` and `port` must be provided below
+
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
@@ -14,18 +24,12 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer);
 
+  io.use(socketioMiddleware);
+
   io.on("connection", (socket) => {
-    // ...
+    console.log("connected");
 
-    socket.on("join-lobby", (name) => {
-      console.log(`${name} has joined lobby!`);
-      socket.join("lobby");
-      socket.emit("join-lobby", true);
-    });
-
-    socket.on("message", (value) => {
-      socket.emit("message", value);
-    });
+    serverEvents(socket, io);
   });
 
   httpServer

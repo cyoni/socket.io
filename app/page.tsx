@@ -1,53 +1,37 @@
 "use client";
+import { useContext, useEffect, useState } from "react";
+import { joinLobby } from "../actions/joinLobby";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { socket } from "../lib/socket";
+import { UserContext } from "../context/UserContext";
+
 
 export default function Home() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [transport, setTransport] = useState("N/A");
   const [name, setName] = useState("");
   const router = useRouter();
+  const { session, createSession } = useContext(UserContext);
 
-  useEffect(() => {
-    if (socket.connected) {
-      onConnect();
+
+  const enterLobby = async () => {
+    if (!name) return;
+
+    const response = await joinLobby(name);
+    if (response.status === "success") {
+      const { name, token } = response;
+
+      sessionStorage.setItem("session", token);
+      createSession({ name, token });
     }
-
-    function onConnect() {
-      setIsConnected(true);
-      setTransport(socket.io.engine.transport.name);
-
-      socket.io.engine.on("upgrade", (transport) => {
-        setTransport(transport.name);
-      });
-    }
-
-    function onDisconnect() {
-      setIsConnected(false);
-      setTransport("N/A");
-    }
-
-    socket.on("join-lobby", (value) => {
-      console.log(`join lobby: ${value}`);
-    //  router.replace("/lobby");
-    });
-
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-
-    return () => {
-      socket.off("join-lobby");
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-    };
-  }, [socket]);
-
-  const enterLobby = () => {
-    socket.emit("join-lobby", name);
+    console.log({ response });
   };
 
-  console.log("socket", socket);
+  useEffect(() => {
+    console.log({ session });
+    if (session) {
+      router.push("/lobby");
+    }
+  }, [session]);
+
+
   return (
     <div>
       <label>Enter your name:</label>
@@ -56,7 +40,9 @@ export default function Home() {
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <button onClick={enterLobby}>Enter</button>
+      <button onClick={enterLobby} className="border ml-2">
+        Enter
+      </button>
     </div>
   );
 }
