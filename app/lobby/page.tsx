@@ -1,28 +1,48 @@
 "use client";
-import React, { useContext, useEffect, useMemo, useState } from "react";
+import React, { use, useContext, useEffect, useMemo, useState } from "react";
 import { UserContext } from "../../context/UserContext";
 import { useRouter } from "next/navigation";
 import { getSocket } from "../../lib/socket";
 import { GET_USERS_IN_LOBBY } from "../../constants/general";
 import Game from "../../components/game/Game";
 import "./styles.css";
+import { useGame } from "../../components/game/useGame";
 
 function LobbyPage() {
   const socket = useMemo(() => getSocket(), []);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
 
-  const router = useRouter();
   const { session } = useContext(UserContext);
   const [usersInLobby, setUsersInLobby] = useState([]);
   const [canSign, setCanSign] = useState(true);
-  const [gameOnGoing, setGameOnGoing] = useState(false);
+  const [leftGameRoom, setLeftGameRoom] = useState(false);
+  const [otherUserWantsNewGame, setOtherUserWantsNewGame] = useState(false);
 
-  // useEffect(() => {
-  //   console.log("session", session);
-  //   if (!session) {
-  //     router.push("/");
-  //   }
-  // }, [session]);
+  const {
+    history,
+    setHistory,
+    handlePlay,
+    currentMove,
+    setCurrentMove,
+    xIsNext,
+    handleClick,
+    squares,
+    calculateWinner,
+    gameData,
+    setGameData,
+    resetGame,
+    startNewGame,
+    setStartNewGame,
+    isGameOver,
+    userLeftGame,
+  } = useGame({ socket });
+
+  useEffect(() => {
+    console.log("session", session);
+    if (!sessionStorage.getItem("session")) {
+      window.location.href = "/";
+    }
+    console.log("session@@", session)
+  }, []);
 
   const [isConnected, setIsConnected] = useState(false);
   const [transport, setTransport] = useState("N/A");
@@ -57,6 +77,10 @@ function LobbyPage() {
       setCanSign(false);
     });
 
+    socket.on("leave_game_room", () => {
+      setGameData((prev) => ({ ...prev, userLeft: true }));
+    });
+
     // socket.on("welcome", (msg, callback) => {
     //   // console.log("welcome:", msg);
     //   // console.log("usersInLobby!", usersInLobby, "msg", msg);
@@ -71,21 +95,16 @@ function LobbyPage() {
     //  // msg("Client has received the data");
     // });
 
-    socket.on("play_request_handshake", (...args) => {
-      console.log("got args", args);
-      /// console.log("got play_request_handshake data", args[0])
-
-      args[1]({ test: "test!!@" });
+    socket.on("play_request_handshake", (data, callback) => {
+      callback({ status: true });
     });
 
-    socket.on("start_game", (msg) => {
-      console.log("GAME_START", msg);
-      setGameOnGoing(true);
+    socket.on("start_game", (data) => {
+      console.log("GAME_START", data);
+      setGameData(data);
     });
 
     socket.on("welcome", (data, callback) => {
-      console.log("got data", data);
-
       callback({ test: "test@" });
     });
 
@@ -94,24 +113,98 @@ function LobbyPage() {
       setUsersInLobby((prev) => [...prev].filter((user) => user.id !== msg.id));
     });
 
+    socket.on("game_move", (data) => {
+      const { square, playerId } = data;
+      console.log("got game_move", data);
+      setGameData((prev) => ({ ...prev, turnUserId: data.turnUserId }));
+      handleClick(square);
+    });
+
+    socket.on("start_new_game", (data) => {
+      console.log("start_new_game  !", data);
+      setOtherUserWantsNewGame(true);
+
+      setGameData((prev) => ({ ...prev, turnUserId: data.turnUserId }));
+    });
+
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
 
     return () => {
-      // socket.off("accept_request");
-      // socket.off("decline_request");
-      // socket.off("play_request");
-      // socket.off("can_sign_to_room");
-      // socket.off("welcome");
-      // socket.off("connect", onConnect);
-      // socket.off("disconnect", onDisconnect);
       socket.removeAllListeners();
-      socket.off(GET_USERS_IN_LOBBY);
     };
-  }, [usersInLobby, socket]);
+  }, [usersInLobby, socket, history]);
 
-  if (gameOnGoing) {
-    return <Game />;
+  useEffect(() => {
+    const handlePopState = () => {
+      console.log("socket?", socket);
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (otherUserWantsNewGame && startNewGame) {
+      resetGame();
+      setGameData((prev) => ({ ...prev, turnUserId: session.decoded.id }));
+      setOtherUserWantsNewGame(false);
+    }
+  }, [otherUserWantsNewGame, startNewGame, session]);
+
+  if (leftGameRoom) {
+    return (
+      <div className="grid place-items-center min-h-screen">
+        <div className="translate-y-[-50%] text-center">
+          <h1 className="text-3xl">You left the game</h1>
+          <button
+            onClick={() => {
+              window.location.reload();
+            }}
+            className="mt-5 shadow-md p-2 px-6 rounded-md bg-blue-600 transition ease-in-out active:scale-90"
+          >
+            Join a Game
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (gameData) {
+    const { roomId, players } = gameData;
+    const [player1, player2] = players;
+    return (
+      <Game
+        socket={socket}
+        turnUserId={gameData.turnUserId}
+        userId={session?.decoded?.id}
+        roomId={roomId}
+        player1={player1}
+        player2={player2}
+        history={history}
+        setHistory={setHistory}
+        handlePlay={handlePlay}
+        currentMove={currentMove}
+        setCurrentMove={setCurrentMove}
+        xIsNext={xIsNext}
+        handleClick={handleClick}
+        squares={squares}
+        calculateWinner={calculateWinner}
+        setLeftGameRoom={setLeftGameRoom}
+        setStartNewGame={setStartNewGame}
+        startNewGame={startNewGame}
+        otherUserWantsNewGame={otherUserWantsNewGame}
+        setOtherUserWantsNewGame={setOtherUserWantsNewGame}
+        isGameOver={isGameOver}
+        userLeftGame={userLeftGame}
+      />
+    );
   }
 
   if (!canSign) {

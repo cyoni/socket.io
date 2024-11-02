@@ -28,9 +28,7 @@ app.prepare().then(() => {
   userMatcherService.startService();
 
   io.on("connection", (socket) => {
-    console.log("connected");
-
-    userMatcherService.addUser(socket.id, socket.userId);
+    console.log("connected@@");
 
     serverEvents(socket, io, userMatcherService);
   });

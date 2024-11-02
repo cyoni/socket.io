@@ -1,4 +1,5 @@
 import { Server } from "socket.io";
+import { activeUsers, playRoom } from "./store";
 
 export class UserMatcherService {
   private waitingUsersQueue: WaitingUser[] = [];
@@ -71,13 +72,32 @@ export class UserMatcherService {
         ];
         if (sockets.every((socket) => !!socket)) {
           const roomId = `game_room_${user1!.userId}_${user2!.userId}`;
+          const user1Data = activeUsers[user1!.userId];
+          const user2Data = activeUsers[user2!.userId];
+
+          user1Data.gameRoomId = roomId;
+          user2Data.gameRoomId = roomId;
+
           sockets.forEach((socket) => {
             socket.join(roomId);
             socket.emit("start_game", {
               roomId,
-              players: { [user1!.userId]: "X", [user2!.userId]: "O" },
+              turnUserId: user1!.userId,
+              players: [
+                { symbol: "X", ...user1Data },
+                { symbol: "O", ...user2Data },
+              ],
             });
           });
+
+          playRoom[roomId] = {
+            turn: "X",
+            turnUserId: user1!.userId,
+            user1Symbol: "X",
+            user2Symbol: "O",
+            userId1: user1!.userId,
+            userId2: user2!.userId,
+          };
         } else {
           console.log("error!!!");
         }

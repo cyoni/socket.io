@@ -19,30 +19,31 @@ export default function Home() {
 
       sessionStorage.setItem("session", token);
       createSession({ name, token });
+      window.location.href = "/lobby";
     }
     console.log({ response });
   };
 
-  useEffect(() => {
-    console.log({ session });
-    if (session) {
-      router.push("/lobby");
-    }
-  }, [session]);
+  // useEffect(() => {
+  //   console.log({ session });
+  //   if (session) {
+  //     router.push("/lobby");
+  //   }
+  // }, [session]);
 
   return (
     <div className="grid place-items-center min-h-screen">
       <form onSubmit={enterLobby} className="translate-y-[-50%]">
         <div>Enter your name:</div>
         <input
-          className="text-black outline-0 p-2 px-4 text-lg rounded-lg font-semibold"
+          className="text-gray-600 outline-0 p-2 px-4 text-lg rounded-lg font-semibold"
           value={name}
           autoFocus
           onChange={(e) => setName(e.target.value)}
         />
         <button
           type="submit"
-          className="ml-2 p-2 px-6 shadow-md rounded-md block mt-2 bg-gradient-to-tr from-blue-700 via-sky-500 active:scale-90 transition "
+          className="ml-2 p-2 px-6 shadow-md rounded-md block mt-2  bg-blue-600 active:scale-90 transition "
         >
           Enter
         </button>
